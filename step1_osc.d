@@ -12,17 +12,19 @@ struct Osc {
     square,
   }
 
+  // Returns [-1, 1] value at the current phase and freq.
   float front() const {
     final switch (_kind) {
     case Kind.sin:
       return sin(_phase);
     case Kind.saw:
-      return _phase;
+      return _phase - PI;
     case Kind.square:
       return sgn(_phase - PI);
     }
   }
 
+  // Increments phase with angular freq normalized by the sample rate.
   void popFront() {
     _phase += 2.0 * PI * _freq / sampleRate;
     _phase %= 2.0 * PI;
