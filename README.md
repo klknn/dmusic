@@ -15,5 +15,7 @@ Download these binaries:
 Run this command to listen to 440Hz sine wave in your computer.
 
 ```shell
-$ rdmd step1_sin.d |  ffplay - -f f32le -ar 44100 -ac 2
+$ rdmd step1_osc.d |  ffplay - -f f32le -ar 44100 -ac 2
 ```
+
+Then, let's change the sine wave into saw or square, or why don't you add your own osc?
