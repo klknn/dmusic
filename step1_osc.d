@@ -1,6 +1,9 @@
 // Usage:
-//   rdmd step1_sin.d |  ffplay - -f f32le -ar 44100 -ac 2
+//   rdmd step1_osc.d |  ffplay - -f f32le -ar 44100 -ac 2
+import std.logger;
 import std.math;
+import std.random;
+import std.range;
 import std.stdio;
 
 const float sampleRate = 44_100;
@@ -10,6 +13,7 @@ struct Osc {
     sin,
     saw,
     square,
+    noise,
   }
 
   float front() const {
@@ -20,6 +24,8 @@ struct Osc {
       return _phase;
     case Kind.square:
       return sgn(_phase - PI);
+    case Kind.noise:
+      return uniform01!float() * 2 - 1;
     }
   }
 
@@ -31,14 +37,14 @@ struct Osc {
   enum bool empty = false;
 
   Kind _kind = Kind.sin;
-  float _freq = 0;
-  float _phase = 0;
+  float _freq = 0; // in herz. must be > 0.
+  float _phase = 0; // in [0, 2 * PI].
 }
 
 void main() {
   float i = 0;
   float[2] wav;
-  foreach (x; Osc(Osc.Kind.sin, 440)) {
+  foreach (x; Osc(Osc.Kind.noise, 440)) {
     wav[] = x;
     stdout.rawWrite(wav);
   }
