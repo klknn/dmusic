@@ -1,23 +1,26 @@
 // Usage:
-//   rdmd step1_osc.d |  ffplay - -f f32le -ar 44100 -ac 2
-import std.logger;
-import std.math;
-import std.random;
-import std.range;
-import std.stdio;
+// - Listen to output raw file by VideoLAN VLC (it also suports pipe input "-")
+//   $ rdmd step1_osc.d output.raw
+//   $ vlc -I dummy --demux=rawaud --rawaud-channels 1 --rawaud-samplerate 44100 --rawaud-fourcc f32l output.raw vlc://quit
+//
+// - Look at its spectrum by FFMPEG ffplay.
+//   $ ffplay -f f32le -ar 44100 -ac 1 output.raw
+//
+// - Convert it to WAV by FFMPEG.
+//   $ ffmpeg -f f32le -ar 44100 -ac 1 -i output.raw output.wav
+import std;
 
-const float sampleRate = 44_100;
+enum sampleRate = 44_100;
 
 struct Osc {
   enum Kind {
     sin,
-    saw,
     square,
+    saw,
     noise,
   }
-
   // Returns [-1, 1] value at the current phase and freq.
-  float front() const {
+  float front() const @nogc @safe {
     final switch (_kind) {
     case Kind.sin:
       return sin(_phase);
@@ -31,22 +34,24 @@ struct Osc {
   }
 
   // Increments phase with angular freq normalized by the sample rate.
-  void popFront() {
+  void popFront() @nogc @safe {
     _phase += 2.0 * PI * _freq / sampleRate;
     _phase %= 2.0 * PI;
   }
 
-  enum bool empty = false;
+  enum bool empty = false; // Infinite range.
 
   Kind _kind = Kind.sin;
   float _freq = 0; // in herz. must be > 0.
   float _phase = 0; // in [0, 2 * PI].
 }
 
-void main() {
-  float[2] wav;
-  foreach (x; Osc(Osc.Kind.noise, 440)) {
-    wav[] = x;
-    stdout.rawWrite(wav);
-  }
+void main(string[] args) {
+  info("Available Osc kinds: ", [EnumMembers!(Osc.Kind)]);
+  File output = args.length > 1 ? File(args[1], "wb") : stdout;
+  info("Output file:", output.name);
+  enum chunkSize = 128;
+  foreach (kind; EnumMembers!(Osc.Kind))
+    foreach (chunk; Osc(kind, 440).take(sampleRate).chunks(chunkSize))
+      output.rawWrite(staticArray!chunkSize(chunk));
 }
