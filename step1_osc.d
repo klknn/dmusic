@@ -44,7 +44,6 @@ struct Osc {
 }
 
 void main() {
-  float i = 0;
   float[2] wav;
   foreach (x; Osc(Osc.Kind.noise, 440)) {
     wav[] = x;
