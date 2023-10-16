@@ -8,50 +8,33 @@
 //
 // - Convert it to WAV by FFMPEG.
 //   $ ffmpeg -f f32le -ar 44100 -ac 1 -i output.raw output.wav
+// dfmt off
 import std;
 
 enum sampleRate = 44_100;
 
-struct Osc {
-  enum Kind {
-    sin,
-    square,
-    saw,
-    noise,
-  }
-  // Returns [-1, 1] value at the current phase and freq.
-  float front() const @nogc @safe {
-    final switch (_kind) {
-    case Kind.sin:
-      return sin(_phase);
-    case Kind.saw:
-      return _phase - PI;
-    case Kind.square:
-      return sgn(_phase - PI);
-    case Kind.noise:
-      return uniform01!float() * 2 - 1;
-    }
-  }
+float saw(float x) { return x - PI; }
+float square(float x) { return sgn(x - PI); }
 
-  // Increments phase with angular freq normalized by the sample rate.
-  void popFront() @nogc @safe {
-    _phase += 2.0 * PI * _freq / sampleRate;
-    _phase %= 2.0 * PI;
-  }
-
-  enum bool empty = false; // Infinite range.
-
-  Kind _kind = Kind.sin;
+struct Osc(alias fun) {
+  float front() const { return fun(_x); }
+  void popFront() { _x = (_x + 2 * PI * _freq / sampleRate) % (2 * PI); }
+  enum bool empty = false;
   float _freq = 0; // in herz. must be > 0.
-  float _phase = 0; // in [0, 2 * PI].
+  float _x = 0; // in [0, 2 * PI].
+}
+
+enum noise = Xorshift(1).map!(a => 2f * a / uint.max - 1);
+
+void writeSamples(int chunkSize = 128, R)(ref File output, R range) {
+   foreach (chunk; range.chunks(chunkSize))
+      output.rawWrite(staticArray!chunkSize(chunk));
 }
 
 void main(string[] args) {
-  info("Available Osc kinds: ", [EnumMembers!(Osc.Kind)]);
   File output = args.length > 1 ? File(args[1], "wb") : stdout;
-  info("Output file:", output.name);
-  enum chunkSize = 128;
-  foreach (kind; EnumMembers!(Osc.Kind))
-    foreach (chunk; Osc(kind, 440).take(sampleRate).chunks(chunkSize))
-      output.rawWrite(staticArray!chunkSize(chunk));
+  int n = sampleRate; // 1sec.
+  foreach (r; tuple(Osc!sin(440), Osc!square(440), Osc!saw(440), noise)) {
+    output.writeSamples(r.take(n));
+  }
 }
