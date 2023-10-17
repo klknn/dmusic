@@ -12,29 +12,22 @@
 import std;
 
 enum sampleRate = 44_100;
+enum noise = Xorshift(1).map!"2f*a/uint.max-1";
 
-float saw(float x) { return x - PI; }
-float square(float x) { return sgn(x - PI); }
-
-struct Osc(alias fun) {
-  float front() const { return fun(_x); }
-  void popFront() { _x = (_x + 2 * PI * _freq / sampleRate) % (2 * PI); }
-  enum bool empty = false;
-  float _freq = 0; // in herz. must be > 0.
-  float _x = 0; // in [0, 2 * PI].
-}
-
-enum noise = Xorshift(1).map!(a => 2f * a / uint.max - 1);
-
-void writeSamples(int chunkSize = 128, R)(ref File output, R range) {
-   foreach (chunk; range.chunks(chunkSize))
-      output.rawWrite(staticArray!chunkSize(chunk));
+// Returns saw waveform in [-PI, PI] cycled in the given frequency.
+struct Osc {
+  @nogc pure @safe:
+  float front() const { return PI * (2 * t - 1); }
+  void popFront() { t = (t + freq / sampleRate) % 1; }
+  enum empty = false;
+  float freq = 0;
+  float t = 0;
 }
 
 void main(string[] args) {
   File output = args.length > 1 ? File(args[1], "wb") : stdout;
-  int n = sampleRate; // 1sec.
-  foreach (r; tuple(Osc!sin(440), Osc!square(440), Osc!saw(440), noise)) {
-    output.writeSamples(r.take(n));
+  Osc osc = {freq: 440};
+  foreach (r; tuple(osc.map!sin, osc.map!sgn, osc, noise)) {
+    output.rawWrite(r.take(sampleRate).array);
   }
 }
